@@ -476,6 +476,13 @@
 {{template "component/themeSwitcher" .}}
 {{template "component/password" .}}
 <script>
+  async function sha384(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-384', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+  }
   class User {
     constructor() {
       this.username = "";
@@ -499,7 +506,12 @@
     methods: {
       async login() {
         this.loading = true;
-        const msg = await HttpUtil.post('/login', this.user);
+        const loginData = {
+            username: await sha384(this.user.username),
+            password: await sha384(this.user.password), 
+            loginSecret: this.user.loginSecret
+          };
+        const msg = await HttpUtil.post('/login', loginData);
         this.loading = false;
         if (msg.success) {
           location.href = basePath + 'panel/';
