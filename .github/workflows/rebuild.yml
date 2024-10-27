@@ -22,14 +22,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 获取最新tag
       - name: Get latest tag
         id: get_tag
         run: |
-          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          git fetch --tags
+          LATEST_TAG=$(git tag | sort -V | tail -1)
+          if [ -z "$LATEST_TAG" ]; then
+            echo "No tags found in the repository"
+            exit 1
+          fi
           echo "RELEASE_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "Latest tag: $LATEST_TAG"
-
       # 删除现有release的资源
       - name: Delete existing release assets
         uses: mknejp/delete-release-assets@v1
