@@ -1,10 +1,7 @@
-name: Rebuild 3X-UI
+name: Release 3X-UI
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*.*.*"
 
 jobs:
   build:
@@ -22,6 +19,26 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 获取最新tag
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          LATEST_TAG=$(git describe --tags `git rev-list --tags --max-count=1`)
+          echo "RELEASE_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "Latest tag: $LATEST_TAG"
+
+      # 删除现有release的资源
+      - name: Delete existing release assets
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ env.RELEASE_TAG }}
+          fail-if-no-assets: false
+          assets: |
+            x-ui-linux-*.tar.gz
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -132,37 +149,11 @@ jobs:
           name: x-ui-linux-${{ matrix.platform }}
           path: ./x-ui-linux-${{ matrix.platform }}.tar.gz
 
-      - name: Delete existing release assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            https://api.github.com/repos/${{ github.repository }}/tags \
-            | jq -r '.[0].name')
-          echo "Latest tag: $response"
-          echo "tag=$response" >> $GITHUB_ENV
-          release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          https://api.github.com/repos/${{ github.repository }}/releases/tags/$latest_tag | jq -r '.id')
-          if [ "$release_id" == "null" ]; then
-            echo "Error: No release found for tag $latest_tag"
-            exit 1
-          fi
-
-          echo "Release ID: $release_id"
-          assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          https://api.github.com/repos/${{ github.repository }}/releases/$release_id | jq -r '.assets[].id')
-          
-          for asset_id in $assets; do
-            echo "Deleting asset with ID: $asset_id"
-            curl -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
-            https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_id
-          done
-
       - name: Upload files to GH release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ github.ref_name }}
+          tag: ${{ env.RELEASE_TAG }}
           file: x-ui-linux-${{ matrix.platform }}.tar.gz
           asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
           prerelease: false
