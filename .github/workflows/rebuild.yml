@@ -25,7 +25,10 @@ jobs:
       - name: Get latest tag
         id: get_tag
         run: |
-          git fetch --tags
+         pwd
+          ls -la
+          git remote -v
+          git fetch --all --tags
           LATEST_TAG=$(git tag | sort -V | tail -1)
           if [ -z "$LATEST_TAG" ]; then
             echo "No tags found in the repository"
