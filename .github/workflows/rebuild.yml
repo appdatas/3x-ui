@@ -4,6 +4,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  delete_assets:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Get latest tag
+        id: get_tag
+        run: |
+          git remote add upstream https://github.com/MHSanaei/3x-ui.git
+          git fetch upstream --tags
+          LATEST_TAG=$(git tag -l "v*" | sort -V | tail -1)
+          if [ -z "$LATEST_TAG" ]; then
+            LATEST_TAG="v1.0.0"
+          fi
+          echo "RELEASE_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "Latest tag: $LATEST_TAG"
+
+      - name: Delete existing release assets
+        uses: mknejp/delete-release-assets@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ env.RELEASE_TAG }}
+          fail-if-no-assets: false
+          assets: |
+            x-ui-linux-*.tar.gz
+
   build:
     strategy:
       matrix:
@@ -61,15 +85,6 @@ jobs:
           draft: false
           prerelease: false
         continue-on-error: true
-          
-      - name: Delete existing release assets
-        uses: mknejp/delete-release-assets@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ env.RELEASE_TAG }}
-          fail-if-no-assets: false
-          assets: |
-            x-ui-linux-*.tar.gz
 
       - name: Setup Go
         uses: actions/setup-go@v5
