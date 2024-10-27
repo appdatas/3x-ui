@@ -1,4 +1,4 @@
-name: Rebuild 3X-UI
+name: Release 3X-UI
 
 on:
   workflow_dispatch:
@@ -69,56 +69,76 @@ jobs:
           go build -o xui-release -v main.go
           
           mkdir x-ui
-          mv xui-release x-ui/x-ui
+          cp xui-release x-ui/
           cp x-ui.service x-ui/
           cp x-ui.sh x-ui/
+          mv x-ui/xui-release x-ui/x-ui
           mkdir x-ui/bin
           cd x-ui/bin
           
           # Download dependencies
           Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v24.10.16/"
-          case "${{ matrix.platform }}" in
-            amd64)  wget ${Xray_URL}Xray-linux-64.zip ;;
-            arm64)  wget ${Xray_URL}Xray-linux-arm64-v8a.zip ;;
-            armv7)  wget ${Xray_URL}Xray-linux-arm32-v7a.zip ;;
-            armv6)  wget ${Xray_URL}Xray-linux-arm32-v6.zip ;;
-            386)    wget ${Xray_URL}Xray-linux-32.zip ;;
-            armv5)  wget ${Xray_URL}Xray-linux-arm32-v5.zip ;;
-            s390x)  wget ${Xray_URL}Xray-linux-s390x.zip ;;
-          esac
-          unzip *.zip && rm -f *.zip
-          
-          # Download rule files
+          if [ "${{ matrix.platform }}" == "amd64" ]; then
+            wget ${Xray_URL}Xray-linux-64.zip
+            unzip Xray-linux-64.zip
+            rm -f Xray-linux-64.zip
+          elif [ "${{ matrix.platform }}" == "arm64" ]; then
+            wget ${Xray_URL}Xray-linux-arm64-v8a.zip
+            unzip Xray-linux-arm64-v8a.zip
+            rm -f Xray-linux-arm64-v8a.zip
+          elif [ "${{ matrix.platform }}" == "armv7" ]; then
+            wget ${Xray_URL}Xray-linux-arm32-v7a.zip
+            unzip Xray-linux-arm32-v7a.zip
+            rm -f Xray-linux-arm32-v7a.zip
+          elif [ "${{ matrix.platform }}" == "armv6" ]; then
+            wget ${Xray_URL}Xray-linux-arm32-v6.zip
+            unzip Xray-linux-arm32-v6.zip
+            rm -f Xray-linux-arm32-v6.zip
+          elif [ "${{ matrix.platform }}" == "386" ]; then
+            wget ${Xray_URL}Xray-linux-32.zip
+            unzip Xray-linux-32.zip
+            rm -f Xray-linux-32.zip
+          elif [ "${{ matrix.platform }}" == "armv5" ]; then
+            wget ${Xray_URL}Xray-linux-arm32-v5.zip
+            unzip Xray-linux-arm32-v5.zip
+            rm -f Xray-linux-arm32-v5.zip
+          elif [ "${{ matrix.platform }}" == "s390x" ]; then
+            wget ${Xray_URL}Xray-linux-s390x.zip
+            unzip Xray-linux-s390x.zip
+            rm -f Xray-linux-s390x.zip
+          fi
+          rm -f geoip.dat geosite.dat
           wget https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
           wget https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
           wget -O geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
           wget -O geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
           wget -O geoip_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geoip.dat
           wget -O geosite_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geosite.dat
-          
           mv xray xray-linux-${{ matrix.platform }}
           cd ../..
-
+          
       - name: Package
         run: tar -zcvf x-ui-linux-${{ matrix.platform }}.tar.gz x-ui
 
-      - name: Get the latest release tag
-        id: get_latest_tag
-        run: |
-          latest_tag=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
-          echo "::set-output name=tag::$latest_tag"
+      - name: Upload files to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: x-ui-linux-${{ matrix.platform }}
+          path: ./x-ui-linux-${{ matrix.platform }}.tar.gz
 
+      # 删除已有 Release 资产（确保不冲突）
       - name: Delete existing release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.get_latest_tag.outputs.tag }} | jq -r '.id')
+          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} | jq -r '.id')
           
           assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          https://api.github.com/repos/${{ github.repository }}/releases/$release_id | jq -r '.assets[] | .id')
+          https://api.github.com/repos/${{ github.repository }}/releases/$release_id | jq -r '.assets[].id')
           
           for asset_id in $assets; do
+            echo "Deleting asset with ID: $asset_id"
             curl -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
             https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_id
           done
@@ -127,7 +147,7 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          tag: ${{ steps.get_latest_tag.outputs.tag }}
+          tag: ${{ github.ref_name }}
           file: x-ui-linux-${{ matrix.platform }}.tar.gz
           asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
           prerelease: false
