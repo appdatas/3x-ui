@@ -60,6 +60,7 @@ jobs:
           release_name: ${{ env.RELEASE_TAG }}
           draft: false
           prerelease: false
+        continue-on-error: true
           
       - name: Delete existing release assets
         uses: mknejp/delete-release-assets@v1
