@@ -36,6 +36,7 @@ jobs:
             LATEST_TAG="v1.0.0"
           fi
           echo "RELEASE_TAG=$LATEST_TAG" >> $GITHUB_ENV
+          echo "RELEASE_TAG=$LATEST_TAG" >> $GITHUB_OUTPUT
           echo "Latest tag: $LATEST_TAG"
         continue-on-error: true
 
