@@ -34,6 +34,7 @@ jobs:
             x-ui-linux-*.tar.gz
 
   build:
+    needs: delete_assets
     strategy:
       matrix:
         platform:
