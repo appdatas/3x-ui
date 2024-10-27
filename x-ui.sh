@@ -287,9 +287,9 @@ reset_webbasepath() {
     config_webBasePath=$(gen_random_string 10)
 
     # Apply the new web base path setting
-    /usr/local/x-ui/x-ui setting -webBasePath "${config_webBasePath}" >/dev/null 2>&1
+    /usr/local/x-ui/x-ui setting -webBasePath "/" >/dev/null 2>&1
     
-    echo -e "Web base path has been reset to: ${green}${config_webBasePath}${plain}"
+    echo -e "Web base path has been reset to: /"
     echo -e "${green}Please use the new web base path to access the panel.${plain}"
     restart
 }
