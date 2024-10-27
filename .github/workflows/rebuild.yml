@@ -7,7 +7,7 @@ jobs:
   delete_assets:
     runs-on: ubuntu-20.04
     outputs:
-      RELEASE_TAG: ${{ steps.get_tag.outputs.LATEST_TAG }}
+      RELEASE_TAG: ${{ steps.get_tag.outputs.RELEASE_TAG }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
