@@ -31,10 +31,6 @@ jobs:
           # 删除所有本地标签
           git tag | xargs git tag -d
           
-          # 删除所有远程标签
-          git fetch
-          git push origin --delete $(git tag -l) || true
-          
           echo "All tags have been deleted"
         continue-on-error: true
         
