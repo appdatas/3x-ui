@@ -145,7 +145,7 @@ config_after_install() {
 
     if [[ ${#existing_webBasePath} -lt 4 ]]; then
         if [[ "$existing_username" == "admin" && "$existing_password" == "admin" ]]; then
-            local config_webBasePath=$(gen_random_string 15)
+            local config_webBasePath="/"
             local config_username=$(gen_random_string 10)
             local config_password=$(gen_random_string 10)
 
