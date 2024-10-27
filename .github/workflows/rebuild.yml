@@ -25,14 +25,15 @@ jobs:
       - name: Get latest tag
         id: get_tag
         run: |
-         pwd
-          ls -la
-          git remote -v
-          git fetch --all --tags
-          LATEST_TAG=$(git tag | sort -V | tail -1)
+         git remote add upstream https://github.com/MHSanaei/3x-ui.git
+          git fetch upstream --tags
+          
+          # 获取最新tag
+          LATEST_TAG=$(git tag -l "v*" | sort -V | tail -1)
           if [ -z "$LATEST_TAG" ]; then
-            echo "No tags found in the repository"
-            exit 1
+            # 如果没有找到tag，使用默认值
+            LATEST_TAG="v1.0.0"
+            echo "No tags found, using default tag: $LATEST_TAG"
           fi
           echo "RELEASE_TAG=$LATEST_TAG" >> $GITHUB_ENV
           echo "Latest tag: $LATEST_TAG"
