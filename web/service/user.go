@@ -2,7 +2,8 @@ package service
 
 import (
 	"errors"
-
+	"crypto/sha512"
+	"encoding/hex"
 	"x-ui/database"
 	"x-ui/database/model"
 	"x-ui/logger"
@@ -94,6 +95,13 @@ func (s *UserService) CheckSecretExistence() (bool, error) {
 	return count > 0, nil
 }
 
+func GenerateSHA384Hash(data string) string {
+	hash := sha512.New384()
+	hash.Write([]byte(data))
+	hashSum := hash.Sum(nil)
+	return hex.EncodeToString(hashSum)
+}
+
 func (s *UserService) UpdateFirstUser(username string, password string) error {
 	if username == "" {
 		return errors.New("username can not be empty")
@@ -104,13 +112,13 @@ func (s *UserService) UpdateFirstUser(username string, password string) error {
 	user := &model.User{}
 	err := db.Model(model.User{}).First(user).Error
 	if database.IsNotFound(err) {
-		user.Username = username
-		user.Password = password
+		user.Username = GenerateSHA384Hash(username)
+		user.Password = GenerateSHA384Hash(password)
 		return db.Model(model.User{}).Create(user).Error
 	} else if err != nil {
 		return err
 	}
-	user.Username = username
-	user.Password = password
+	user.Username = GenerateSHA384Hash(username)
+	user.Password = GenerateSHA384Hash(password)
 	return db.Save(user).Error
 }
