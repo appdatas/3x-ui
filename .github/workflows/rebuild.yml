@@ -1,0 +1,133 @@
+name: Release 3X-UI
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        platform:
+          - amd64
+          - arm64
+          - armv7
+          - armv6
+          - 386
+          - armv5
+          - s390x
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          if [ "${{ matrix.platform }}" == "arm64" ]; then
+            sudo apt install gcc-aarch64-linux-gnu
+          elif [ "${{ matrix.platform }}" == "armv7" ]; then
+            sudo apt install gcc-arm-linux-gnueabihf
+          elif [ "${{ matrix.platform }}" == "armv6" ]; then
+            sudo apt install gcc-arm-linux-gnueabihf
+          elif [ "${{ matrix.platform }}" == "386" ]; then
+            sudo apt install gcc-i686-linux-gnu
+          elif [ "${{ matrix.platform }}" == "armv5" ]; then
+            sudo apt install gcc-arm-linux-gnueabi
+          elif [ "${{ matrix.platform }}" == "s390x" ]; then
+            sudo apt install gcc-s390x-linux-gnu
+          fi
+
+      - name: Build x-ui
+        run: |
+          export CGO_ENABLED=1
+          export GOOS=linux
+          export GOARCH=${{ matrix.platform }}
+          if [ "${{ matrix.platform }}" == "arm64" ]; then
+            export CC=aarch64-linux-gnu-gcc
+          elif [ "${{ matrix.platform }}" == "armv7" ]; then
+            export GOARM=7
+            export CC=arm-linux-gnueabihf-gcc
+          elif [ "${{ matrix.platform }}" == "armv6" ]; then
+            export GOARM=6
+            export CC=arm-linux-gnueabihf-gcc
+          elif [ "${{ matrix.platform }}" == "386" ]; then
+            export CC=i686-linux-gnu-gcc
+          elif [ "${{ matrix.platform }}" == "armv5" ]; then
+            export GOARM=5
+            export CC=arm-linux-gnueabi-gcc
+          elif [ "${{ matrix.platform }}" == "s390x" ]; then
+            export CC=s390x-linux-gnu-gcc
+          fi
+          go build -o xui-release -v main.go
+          
+          mkdir x-ui
+          mv xui-release x-ui/x-ui
+          cp x-ui.service x-ui/
+          cp x-ui.sh x-ui/
+          mkdir x-ui/bin
+          cd x-ui/bin
+          
+          # Download dependencies
+          Xray_URL="https://github.com/XTLS/Xray-core/releases/download/v24.10.16/"
+          case "${{ matrix.platform }}" in
+            amd64)  wget ${Xray_URL}Xray-linux-64.zip ;;
+            arm64)  wget ${Xray_URL}Xray-linux-arm64-v8a.zip ;;
+            armv7)  wget ${Xray_URL}Xray-linux-arm32-v7a.zip ;;
+            armv6)  wget ${Xray_URL}Xray-linux-arm32-v6.zip ;;
+            386)    wget ${Xray_URL}Xray-linux-32.zip ;;
+            armv5)  wget ${Xray_URL}Xray-linux-arm32-v5.zip ;;
+            s390x)  wget ${Xray_URL}Xray-linux-s390x.zip ;;
+          esac
+          unzip *.zip && rm -f *.zip
+          
+          # Download rule files
+          wget https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+          wget https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+          wget -O geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
+          wget -O geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
+          wget -O geoip_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geoip.dat
+          wget -O geosite_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geosite.dat
+          
+          mv xray xray-linux-${{ matrix.platform }}
+          cd ../..
+
+      - name: Package
+        run: tar -zcvf x-ui-linux-${{ matrix.platform }}.tar.gz x-ui
+
+      - name: Get the latest release tag
+        id: get_latest_tag
+        run: |
+          latest_tag=$(curl -s https://api.github.com/repos/${{ github.repository }}/releases/latest | jq -r '.tag_name')
+          echo "::set-output name=tag::$latest_tag"
+
+      - name: Delete existing release assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ steps.get_latest_tag.outputs.tag }} | jq -r '.id')
+          
+          assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+          https://api.github.com/repos/${{ github.repository }}/releases/$release_id | jq -r '.assets[] | .id')
+          
+          for asset_id in $assets; do
+            curl -X DELETE -H "Authorization: token $GITHUB_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }}/releases/assets/$asset_id
+          done
+
+      - name: Upload files to GH release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.get_latest_tag.outputs.tag }}
+          file: x-ui-linux-${{ matrix.platform }}.tar.gz
+          asset_name: x-ui-linux-${{ matrix.platform }}.tar.gz
+          prerelease: false
