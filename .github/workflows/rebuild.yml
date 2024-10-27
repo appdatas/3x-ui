@@ -51,19 +51,25 @@ jobs:
           export GOOS=linux
           export GOARCH=${{ matrix.platform }}
           if [ "${{ matrix.platform }}" == "arm64" ]; then
+            export GOARCH=arm64
             export CC=aarch64-linux-gnu-gcc
           elif [ "${{ matrix.platform }}" == "armv7" ]; then
+            export GOARCH=arm
             export GOARM=7
             export CC=arm-linux-gnueabihf-gcc
           elif [ "${{ matrix.platform }}" == "armv6" ]; then
+            export GOARCH=arm
             export GOARM=6
             export CC=arm-linux-gnueabihf-gcc
           elif [ "${{ matrix.platform }}" == "386" ]; then
+            export GOARCH=386
             export CC=i686-linux-gnu-gcc
           elif [ "${{ matrix.platform }}" == "armv5" ]; then
+            export GOARCH=arm
             export GOARM=5
             export CC=arm-linux-gnueabi-gcc
           elif [ "${{ matrix.platform }}" == "s390x" ]; then
+            export GOARCH=s390x
             export CC=s390x-linux-gnu-gcc
           fi
           go build -o xui-release -v main.go
@@ -126,14 +132,23 @@ jobs:
           name: x-ui-linux-${{ matrix.platform }}
           path: ./x-ui-linux-${{ matrix.platform }}.tar.gz
 
-      # 删除已有 Release 资产（确保不冲突）
       - name: Delete existing release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          response=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            https://api.github.com/repos/${{ github.repository }}/tags \
+            | jq -r '.[0].name')
+          echo "Latest tag: $response"
+          echo "tag=$response" >> $GITHUB_ENV
           release_id=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-          https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} | jq -r '.id')
-          
+          https://api.github.com/repos/${{ github.repository }}/releases/tags/$latest_tag | jq -r '.id')
+          if [ "$release_id" == "null" ]; then
+            echo "Error: No release found for tag $latest_tag"
+            exit 1
+          fi
+
+          echo "Release ID: $release_id"
           assets=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
           https://api.github.com/repos/${{ github.repository }}/releases/$release_id | jq -r '.assets[].id')
           
