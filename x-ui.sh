@@ -192,7 +192,7 @@ update_menu() {
     fi
 }
 
-custom_version() {
+legacy_version() {
     echo "Enter the panel version (like 2.4.0):"
     read tag_version
 
@@ -200,17 +200,8 @@ custom_version() {
         echo "Panel version cannot be empty. Exiting."
         exit 1
     fi
-
-    min_version="2.3.5"
-    if [[ "$(printf '%s\n' "$tag_version" "$min_version" | sort -V | head -n1)" == "$tag_version" && "$tag_version" != "$min_version" ]]; then
-        echo "Please use a newer version (at least 2.3.5). Exiting."
-        exit 1
-    fi
-
-    download_link="https://raw.githubusercontent.com/appdatas/3x-ui/master/install.sh"
-
     # Use the entered panel version in the download link
-    install_command="bash <(curl -Ls $download_link) v$tag_version"
+    install_command="bash <(curl -Ls "https://raw.githubusercontent.com/appdatas/3x-ui/v$tag_version/install.sh") v$tag_version"
 
     echo "Downloading and installing panel version $tag_version..."
     eval $install_command
@@ -308,12 +299,19 @@ reset_config() {
 }
 
 check_config() {
-    info=$(/usr/local/x-ui/x-ui setting -show true)
+    local info=$(/usr/local/x-ui/x-ui setting -show true)
     if [[ $? != 0 ]]; then
         LOGE "get current settings error, please check logs"
         show_menu
+        return
     fi
     LOGI "${info}"
+
+    local existing_webBasePath=$(echo "$info" | grep -Eo 'webBasePath: .+' | awk '{print $2}')
+    local existing_port=$(echo "$info" | grep -Eo 'port: .+' | awk '{print $2}')
+    local server_ip=$(curl -s https://api.ipify.org)
+
+    echo -e "${green}Access URL: http://${server_ip}:${existing_port}${existing_webBasePath}${plain}"
 }
 
 set_port() {
@@ -933,6 +931,8 @@ ssl_cert_issue_main() {
 }
 
 ssl_cert_issue() {
+    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
     # check for acme.sh first
     if ! command -v ~/.acme.sh/acme.sh &>/dev/null; then
         echo "acme.sh could not be found. we will install it"
@@ -1051,6 +1051,7 @@ ssl_cert_issue() {
             LOGI "Panel paths set for domain: $domain"
             LOGI "  - Certificate File: $webCertFile"
             LOGI "  - Private Key File: $webKeyFile"
+            echo -e "${green}Access URL: https://${domain}:${existing_port}${existing_webBasePath}${plain}"
             restart
         else
             LOGE "Error: Certificate or private key file not found for domain: $domain."
@@ -1170,6 +1171,7 @@ run_speedtest() {
     # Run Speedtest
     speedtest
 }
+
 create_iplimit_jails() {
     # Use default bantime if not passed => 15 minutes
     local bantime="${1:-15}"
@@ -1177,7 +1179,7 @@ create_iplimit_jails() {
     # Uncomment 'allowipv6 = auto' in fail2ban.conf
     sed -i 's/#allowipv6 = auto/allowipv6 = auto/g' /etc/fail2ban/fail2ban.conf
 
-    #On Debian 12+ fail2ban's default backend should be changed to systemd
+    # On Debian 12+ fail2ban's default backend should be changed to systemd
     if [[  "${release}" == "debian" && ${os_version} -ge 12 ]]; then
         sed -i '0,/action =/s/backend = auto/backend = systemd/' /etc/fail2ban/jail.conf
     fi
@@ -1187,7 +1189,7 @@ create_iplimit_jails() {
 enabled=true
 backend=auto
 filter=3x-ipl
-action=3x-ipl
+action = %(known/action)s[name=%(__name__)s, protocol="%(protocol)s", chain="%(chain)s"]
 logpath=${iplimit_log_path}
 maxretry=2
 findtime=32
@@ -1203,7 +1205,7 @@ EOF
 
     cat << EOF > /etc/fail2ban/action.d/3x-ipl.conf
 [INCLUDES]
-before = iptables-allports.conf
+before = iptables-common.conf
 
 [Definition]
 actionstart = <iptables> -N f2b-<name>
@@ -1223,6 +1225,11 @@ actionunban = <iptables> -D f2b-<name> -s <ip> -j <blocktype>
               echo "\$(date +"%%Y/%%m/%%d %%H:%%M:%%S")   UNBAN   [Email] = <F-USER> [IP] = <ip> unbanned." >> ${iplimit_banned_log_path}
 
 [Init]
+# Use default settings from iptables-common.conf
+# This will automatically handle both IPv4 and IPv6
+name = default
+protocol = tcp
+chain = INPUT
 EOF
 
     echo -e "${green}Ip Limit jail files created with a bantime of ${bantime} minutes.${plain}"
@@ -1247,10 +1254,11 @@ iplimit_main() {
     echo -e "\n${green}\t1.${plain} Install Fail2ban and configure IP Limit"
     echo -e "${green}\t2.${plain} Change Ban Duration"
     echo -e "${green}\t3.${plain} Unban Everyone"
-    echo -e "${green}\t4.${plain} Check Logs"
-    echo -e "${green}\t5.${plain} Fail2ban Status"
-    echo -e "${green}\t6.${plain} Restart Fail2ban"
-    echo -e "${green}\t7.${plain} Uninstall Fail2ban"
+    echo -e "${green}\t4.${plain} Ban Logs"
+    echo -e "${green}\t5.${plain} Real-Time Logs"
+    echo -e "${green}\t6.${plain} Service Status"
+    echo -e "${green}\t7.${plain} Service Restart"
+    echo -e "${green}\t8.${plain} Uninstall Fail2ban and IP Limit"
     echo -e "${green}\t0.${plain} Back to Main Menu"
     read -p "Choose an option: " choice
     case "$choice" in
@@ -1291,12 +1299,15 @@ iplimit_main() {
         show_banlog
         ;;
     5)
-        service fail2ban status
+        tail -f /var/log/fail2ban.log
         ;;
     6)
-        systemctl restart fail2ban
+        service fail2ban status
         ;;
     7)
+        systemctl restart fail2ban
+        ;;
+    8)
         remove_iplimit
         ;;
     *) echo "Invalid choice" ;;
@@ -1430,6 +1441,82 @@ remove_iplimit() {
     esac
 }
 
+SSH_port_forwarding() {
+    local server_ip=$(curl -s https://api.ipify.org)
+    local existing_webBasePath=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'webBasePath: .+' | awk '{print $2}')
+    local existing_port=$(/usr/local/x-ui/x-ui setting -show true | grep -Eo 'port: .+' | awk '{print $2}')
+    local existing_listenIP=$(/usr/local/x-ui/x-ui setting -getListen true | grep -Eo 'listenIP: .+' | awk '{print $2}')
+    local existing_cert=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'cert: .+' | awk '{print $2}')
+    local existing_key=$(/usr/local/x-ui/x-ui setting -getCert true | grep -Eo 'key: .+' | awk '{print $2}')
+
+    local config_listenIP=""
+    local listen_choice=""
+
+    if [[ -n "$existing_cert" && -n "$existing_key" ]]; then
+        echo -e "${green}Panel is secure with SSL.${plain}"
+        return 0
+    fi
+    if [[ -z "$existing_cert" && -z "$existing_key" && (-z "$existing_listenIP" || "$existing_listenIP" == "0.0.0.0") ]]; then
+        echo -e "\n${red}Warning: No Cert and Key found! The panel is not secure.${plain}"
+        echo "Please obtain a certificate or set up SSH port forwarding."
+    fi
+
+    if [[ -n "$existing_listenIP" && "$existing_listenIP" != "0.0.0.0" && (-z "$existing_cert" && -z "$existing_key") ]]; then
+        echo -e "\n${green}Current SSH Port Forwarding Configuration:${plain}"
+        echo -e "Standard SSH command:"
+        echo -e "${yellow}ssh -L 2222:${existing_listenIP}:${existing_port} root@${server_ip}${plain}"
+        echo -e "\nIf using SSH key:"
+        echo -e "${yellow}ssh -i <sshkeypath> -L 2222:${existing_listenIP}:${existing_port} root@${server_ip}${plain}"
+        echo -e "\nAfter connecting, access the panel at:"
+        echo -e "${yellow}http://localhost:2222${existing_webBasePath}${plain}"
+    fi
+
+    echo -e "\nChoose an option:"
+    echo -e "${green}1.${plain} Set listen IP"
+    echo -e "${green}2.${plain} Clear listen IP"
+    echo -e "${green}0.${plain} Abort"
+    read -p "Choose an option: " num
+
+    case "$num" in
+    1)
+        if [[ -z "$existing_listenIP" || "$existing_listenIP" == "0.0.0.0" ]]; then
+            echo -e "\nNo listenIP configured. Choose an option:"
+            echo -e "1. Use default IP (127.0.0.1)"
+            echo -e "2. Set a custom IP"
+            read -p "Select an option (1 or 2): " listen_choice
+
+            config_listenIP="127.0.0.1"
+            [[ "$listen_choice" == "2" ]] && read -p "Enter custom IP to listen on: " config_listenIP
+
+            /usr/local/x-ui/x-ui setting -listenIP "${config_listenIP}" >/dev/null 2>&1
+            echo -e "${green}listen IP has been set to ${config_listenIP}.${plain}"
+            echo -e "\n${green}SSH Port Forwarding Configuration:${plain}"
+            echo -e "Standard SSH command:"
+            echo -e "${yellow}ssh -L 2222:${config_listenIP}:${existing_port} root@${server_ip}${plain}"
+            echo -e "\nIf using SSH key:"
+            echo -e "${yellow}ssh -i <sshkeypath> -L 2222:${config_listenIP}:${existing_port} root@${server_ip}${plain}"
+            echo -e "\nAfter connecting, access the panel at:"
+            echo -e "${yellow}http://localhost:2222${existing_webBasePath}${plain}"
+            restart
+        else
+            config_listenIP="${existing_listenIP}"
+            echo -e "${green}Current listen IP is already set to ${config_listenIP}.${plain}"
+        fi
+        ;;
+    2)
+        /usr/local/x-ui/x-ui setting -listenIP 0.0.0.0 >/dev/null 2>&1
+        echo -e "${green}Listen IP has been cleared.${plain}"
+        restart
+        ;;
+    0)
+        echo "Operation aborted."
+        ;;
+    *)
+        echo "Invalid option. Exiting."
+        ;;
+    esac
+}
+
 show_usage() {
     echo "x-ui control menu usages: "
     echo "------------------------------------------"
@@ -1459,7 +1546,7 @@ show_menu() {
   ${green}1.${plain} Install
   ${green}2.${plain} Update
   ${green}3.${plain} Update Menu
-  ${green}4.${plain} Old Version
+  ${green}4.${plain} Legacy Version
   ${green}5.${plain} Uninstall
 ————————————————
   ${green}6.${plain} Reset Username & Password & Secret Token
@@ -1481,13 +1568,14 @@ show_menu() {
   ${green}19.${plain} Cloudflare SSL Certificate
   ${green}20.${plain} IP Limit Management
   ${green}21.${plain} Firewall Management
+  ${green}22.${plain} SSH Port Forwarding Management
 ————————————————
-  ${green}22.${plain} Enable BBR 
-  ${green}23.${plain} Update Geo Files
-  ${green}24.${plain} Speedtest by Ookla
+  ${green}23.${plain} Enable BBR 
+  ${green}24.${plain} Update Geo Files
+  ${green}25.${plain} Speedtest by Ookla
 "
     show_status
-    echo && read -p "Please enter your selection [0-24]: " num
+    echo && read -p "Please enter your selection [0-25]: " num
 
     case "${num}" in
     0)
@@ -1503,7 +1591,7 @@ show_menu() {
         check_install && update_menu
         ;;
     4)
-        check_install && custom_version
+        check_install && legacy_version
         ;;
     5)
         check_install && uninstall
@@ -1557,16 +1645,19 @@ show_menu() {
         firewall_menu
         ;;
     22)
-        bbr_menu
+        SSH_port_forwarding
         ;;
     23)
-        update_geo
+        bbr_menu
         ;;
     24)
+        update_geo
+        ;;
+    25)
         run_speedtest
         ;;
     *)
-        LOGE "Please enter the correct number [0-24]"
+        LOGE "Please enter the correct number [0-25]"
         ;;
     esac
 }
@@ -1603,8 +1694,8 @@ if [[ $# > 0 ]]; then
     "update")
         check_install 0 && update 0
         ;;
-    "custom")
-        check_install 0 && custom_version 0
+    "legacy")
+        check_install 0 && legacy_version 0
         ;;
     "install")
         check_uninstall 0 && install 0
