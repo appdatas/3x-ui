@@ -381,6 +381,8 @@
     padding: 0 16px !important;
   }
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha3/0.9.0/sha3.min.js"></script>
+  <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/js-sha3/0.9.0/sha3.min.js"></script>
 <body>
   <a-layout id="app" v-cloak :class="themeSwitcher.currentTheme">
     <transition name="list" appear>
@@ -477,12 +479,40 @@
 {{template "component/password" .}}
 <script>
   async function sha384(message) {
+    if (crypto.subtle && typeof crypto.subtle.digest === 'function') {
     const msgBuffer = new TextEncoder().encode(message);
     const hashBuffer = await crypto.subtle.digest('SHA-384', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     return hashHex;
+  } else {
+      try {
+      const cdnUrls = [
+        'https://cdnjs.cloudflare.com/ajax/libs/js-sha3/0.9.0/sha3.min.js',
+        'https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/js-sha3/0.9.0/sha3.min.js'
+      ];
+
+     const promises = cdnUrls.map(url => loadScript(url));
+      const [fastestUrl] = await Promise.race(promises);
+      await Promise.all(promises.filter(p => p !== fastestUrl));
+      await loadScript(fastestUrl);
+      return sha3.sha384(message);
+    } catch (error) {
+      console.error('Failed to load JS-SHA3 library:', error);
+      throw new Error('Unable to compute SHA-384 hash');
+    }
+    }
   }
+
+async function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = () => resolve(src);
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
   class User {
     constructor() {
       this.username = "";
