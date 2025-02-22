@@ -12,7 +12,6 @@ import (
 	"x-ui/config"
 	"x-ui/database"
 	"x-ui/logger"
-	"x-ui/sub"
 	"x-ui/web"
 	"x-ui/web/global"
 	"x-ui/web/service"
@@ -52,14 +51,6 @@ func runWebServer() {
 		return
 	}
 
-	var subServer *sub.Server
-	subServer = sub.NewServer()
-	global.SetSubServer(subServer)
-	err = subServer.Start()
-	if err != nil {
-		log.Fatalf("Error starting sub server: %v", err)
-		return
-	}
 
 	sigCh := make(chan os.Signal, 1)
 	// Trap shutdown signals
