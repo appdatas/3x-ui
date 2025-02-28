@@ -213,7 +213,7 @@ func updateSetting(port int, username string, password string, webBasePath strin
 	settingService := service.SettingService{}
 	userService := service.UserService{}
 
-	if port > 0 {
+	if port > -1 {
 		err := settingService.SetPort(port)
 		if err != nil {
 			fmt.Println("Failed to set port:", err)
