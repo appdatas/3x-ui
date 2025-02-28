@@ -331,75 +331,70 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-    if port == 0 {
-	// Using socket path to listen
-	socketPath := "/var/run/xray/x-ui.sock"
-	// Check if socket directory exists; create if it doesn't
-	dir := filepath.Dir(socketPath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			return err
-		}
-	}
-	// Remove existing socket file
-	if _, err := os.Stat(socketPath); err == nil {
-		err = os.Remove(socketPath)
-		if err != nil {
-			return err
-		}
-	}
-	// Listen on unix socket
-	listener, err = net.Listen("unix", socketPath)
-	if err != nil {
-		return err
-	}
-
-	// Set socket file permission
-	err = os.Chmod(socketPath, 0770)
-	if err != nil {
-		logger.Error("设置 socket 权限失败:", err)
-		return err
-	}
+    var listener net.Listener
+if port == 0 {
+    // Use socket path for listening.
+    socketPath := "/var/run/xray/x-ui.sock"
+    // Check if the socket directory exists; create if it doesn’t.
+    dir := filepath.Dir(socketPath)
+    if _, err := os.Stat(dir); os.IsNotExist(err) {
+        if err = os.MkdirAll(dir, 0755); err != nil {
+            return err
+        }
+    }
+    // Remove existing socket file.
+    if _, err := os.Stat(socketPath); err == nil {
+        if err = os.Remove(socketPath); err != nil {
+            return err
+        }
+    }
+    // Listen on unix socket.
+    listener, err = net.Listen("unix", socketPath)
+    if err != nil {
+        return err
+    }
+    // Set socket file permission.
+    if err = os.Chmod(socketPath, 0770); err != nil {
+        logger.Error("设置 socket 权限失败:", err)
+        return err
+    }
 } else {
-	listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
-	listener, err = net.Listen("tcp", listenAddr)
-	if err != nil {
-		return err
-	}
+    // Use TCP for listening.
+    listenAddr = net.JoinHostPort(listen, strconv.Itoa(port))
+    listener, err = net.Listen("tcp", listenAddr)
+    if err != nil {
+        return err
+    }
 }
 
-// Wrap listener as HTTPS if certificate is configured
+// Wrap listener as HTTPS if certificate is configured.
 if certFile != "" || keyFile != "" {
-	cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-	if err == nil {
-		cfg := &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		}
-		listener = network.NewAutoHttpsListener(listener)
-		listener = tls.NewListener(listener, cfg)
-		if port == 0 {
-			logger.Info("Web 服务器以 HTTPS 方式监听，在 socket:/var/run/xray/x-ui.sock")
-		} else {
-			logger.Info("Web 服务器以 HTTPS 方式监听，在", listenAddr)
-		}
-	} else {
-		logger.Error("加载证书时出错:", err)
-		if port == 0 {
-			logger.Info("Web 服务器以 HTTP 方式监听，在 socket:/var/run/xray/x-ui.sock")
-		} else {
-			logger.Info("Web 服务器以 HTTP 方式监听，在", listenAddr)
-		}
-	}
+    cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+    if err == nil {
+        cfg := &tls.Config{Certificates: []tls.Certificate{cert}}
+        listener = network.NewAutoHttpsListener(listener)
+        listener = tls.NewListener(listener, cfg)
+        if port == 0 {
+            logger.Info("Web 服务器以 HTTPS 方式监听，在 socket:/var/run/xray/x-ui.sock")
+        } else {
+            logger.Info("Web 服务器以 HTTPS 方式监听，在", listenAddr)
+        }
+    } else {
+        logger.Error("加载证书时出错:", err)
+        if port == 0 {
+            logger.Info("Web 服务器以 HTTP 方式监听，在 socket:/var/run/xray/x-ui.sock")
+        } else {
+            logger.Info("Web 服务器以 HTTP 方式监听，在", listenAddr)
+        }
+    }
 } else {
-	if port == 0 {
-		logger.Info("Web 服务器以 HTTP 方式监听，在 socket:/var/run/xray/x-ui.sock")
-	} else {
-		logger.Info("Web 服务器以 HTTP 方式监听，在", listenAddr)
-	}
+    if port == 0 {
+        logger.Info("Web 服务器以 HTTP 方式监听，在 socket:/var/run/xray/x-ui.sock")
+    } else {
+        logger.Info("Web 服务器以 HTTP 方式监听，在", listenAddr)
+    }
 }
 
-s.listener = listener
 	s.listener = listener
 
 	s.httpServer = &http.Server{
