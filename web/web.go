@@ -332,6 +332,7 @@ func (s *Server) Start() (err error) {
 		return err
 	}
     var listener net.Listener
+    var listenAddr string
 if port == 0 {
     // Use socket path for listening.
     socketPath := "/var/run/xray/x-ui.sock"
