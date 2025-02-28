@@ -90,6 +90,10 @@ elif [[ "${release}" == "ol" ]]; then
     if [[ ${os_version} -lt 8 ]]; then
         echo -e "${red} Please use Oracle Linux 8 or higher ${plain}\n" && exit 1
     fi
+elif [[ "${release}" == "virtuozzo" ]]; then
+    if [[ ${os_version} -lt 8 ]]; then
+        echo -e "${red} Please use Virtuozzo Linux 8 or higher ${plain}\n" && exit 1
+    fi
 else
     echo -e "${red}Your operating system is not supported by this script.${plain}\n"
     echo "Please ensure you are using one of the following supported operating systems:"
@@ -107,6 +111,7 @@ else
     echo "- Oracle Linux 8+"
     echo "- OpenSUSE Tumbleweed"
     echo "- Amazon Linux 2023"
+    echo "- Virtuozzo Linux 8+"
     exit 1
 fi
 
@@ -118,7 +123,7 @@ install_base() {
     centos | almalinux | rocky | ol)
         yum -y update && yum install -y -q wget curl tar tzdata
         ;;
-    fedora | amzn)
+    fedora | amzn | virtuozzo)
         dnf -y update && dnf install -y -q wget curl tar tzdata
         ;;
     arch | manjaro | parch)
@@ -226,7 +231,7 @@ install_x-ui() {
 
         url="https://github.com/appdatas/3x-ui/releases/download/${tag_version}/x-ui-linux-$(arch).tar.gz"
         echo -e "Beginning to install x-ui $1"
-        wget -N --no-check-certificate -O /usr/local/x-ui-linux-$(arch).tar.gz ${url}
+        wget -N -O /usr/local/x-ui-linux-$(arch).tar.gz ${url}
         if [[ $? -ne 0 ]]; then
             echo -e "${red}Download x-ui $1 failed, please check if the version exists ${plain}"
             exit 1
