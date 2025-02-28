@@ -323,56 +323,86 @@ func (s *Server) Start() (err error) {
 	if err != nil {
 		return err
 	}
-	// 使用 socket 路径来监听
-	socketPath := "/var/run/xray/x-ui.sock"
+    listen, err := s.settingService.GetListen()
 	if err != nil {
 		return err
 	}
-	// 检查 socket 文件所在目录是否存在，不存在则创建
-	dir := filepath.Dir(socketPath)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		err = os.MkdirAll(dir, 0755)
-		if err != nil {
-			return err
-		}
-	}
-	// 如果 socket 文件已经存在，则删除
-	if _, err := os.Stat(socketPath); err == nil {
-		err = os.Remove(socketPath)
-		if err != nil {
-			return err
-		}
-	}
-	// 使用 unix 域套接字监听
-	listener, err := net.Listen("unix", socketPath)
+	port, err := s.settingService.GetPort()
 	if err != nil {
 		return err
 	}
+    if port == 0 {
+        // 使用 socket 路径来监听
+        socketPath := "/var/run/xray/x-ui.sock"
+        if err != nil {
+            return err
+        }
+        // 检查 socket 文件所在目录是否存在，不存在则创建
+        dir := filepath.Dir(socketPath)
+        if _, err := os.Stat(dir); os.IsNotExist(err) {
+            err = os.MkdirAll(dir, 0755)
+            if err != nil {
+                return err
+            }
+        }
+        // 如果 socket 文件已经存在，则删除
+        if _, err := os.Stat(socketPath); err == nil {
+            err = os.Remove(socketPath)
+            if err != nil {
+                return err
+            }
+        }
+        // 使用 unix 域套接字监听
+        listener, err := net.Listen("unix", socketPath)
+        if err != nil {
+            return err
+        }
 
-	// 设置 socket 文件的权限，确保只有本程序、nginx 或者 root 用户可以访问
-	err = os.Chmod(socketPath, 0770)
-	if err != nil {
-		logger.Error("设置 socket 权限失败:", err)
-		return err
-	}
-
-	// 如果配置了证书，则包装为 HTTPS 监听
-	if certFile != "" || keyFile != "" {
-		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
-		if err == nil {
-			c := &tls.Config{
-				Certificates: []tls.Certificate{cert},
-			}
-			listener = network.NewAutoHttpsListener(listener)
-			listener = tls.NewListener(listener, c)
-			logger.Info("Web 服务器以 HTTPS 方式监听，在 socket:", socketPath)
-		} else {
-			logger.Error("加载证书时出错:", err)
-			logger.Info("Web 服务器以 HTTP 方式监听，在 socket:", socketPath)
-		}
-	} else {
-		logger.Info("Web 服务器以 HTTP 方式监听，在 socket:", socketPath)
-	}
+        // 设置 socket 文件的权限，确保只有本程序、nginx 或者 root 用户可以访问
+        err = os.Chmod(socketPath, 0770)
+        if err != nil {
+            logger.Error("设置 socket 权限失败:", err)
+            return err
+        }
+    } else {
+        listenAddr := net.JoinHostPort(listen, strconv.Itoa(port))
+        listener, err := net.Listen("tcp", listenAddr)
+        if err != nil {
+            return err
+        }
+    }
+    // 如果配置了证书，则包装为 HTTPS 监听
+        if certFile != "" || keyFile != "" {
+            cert, err := tls.LoadX509KeyPair(certFile, keyFile)
+            if err == nil {
+                c := &tls.Config{
+                    Certificates: []tls.Certificate{cert},
+                }
+                listener = network.NewAutoHttpsListener(listener)
+                listener = tls.NewListener(listener, c)
+                if port == 0 {
+                logger.Info("Web 服务器以 HTTPS 方式监听，在 socket:/var/run/xray/x-ui.sock")
+                }
+                else {
+                logger.Info("Web 服务器以 HTTPS 方式监听，在", listenAddr)
+                }
+            } else {
+                logger.Error("加载证书时出错:", err)
+                if port == 0 {
+                    logger.Info("Web 服务器以 HTTP 方式监听，在 socket:/var/run/xray/x-ui.sock")
+                }
+                else {
+                    logger.Info("Web 服务器以 HTTP 方式监听，在", listenAddr)
+                }
+            }
+        } else {
+            if port == 0 {
+                logger.Info("Web 服务器以 HTTP 方式监听，在 socket:/var/run/xray/x-ui.sock")
+            }
+            else {
+                logger.Info("Web 服务器以 HTTP 方式监听，在", listenAddr)
+                }
+        }
 	s.listener = listener
 
 	s.httpServer = &http.Server{
