@@ -60,6 +60,7 @@ const UTLS_FINGERPRINT = {
     UTLS_QQ: "qq",
     UTLS_RANDOM: "random",
     UTLS_RANDOMIZED: "randomized",
+    UTLS_RONDOMIZEDNOALPN: "randomizednoalpn",
     UTLS_UNSAFE: "unsafe",
 };
 
@@ -1301,7 +1302,7 @@ class Inbound extends XrayCommonClass {
             }
         }
 
-        return 'vmess://' + base64(JSON.stringify(obj, null, 2));
+        return 'vmess://' + Base64.encode(JSON.stringify(obj, null, 2));
     }
 
     genVLESSLink(address = '', port = this.port, forceTls, remark = '', clientId, flow) {
@@ -1473,7 +1474,7 @@ class Inbound extends XrayCommonClass {
         if (this.isSS2022) password.push(settings.password);
         if (this.isSSMultiUser) password.push(clientPassword);
 
-        let link = `ss://${safeBase64(settings.method + ':' + password.join(':'))}@${address}:${port}`;
+        let link = `ss://${Base64.encode(`${settings.method}:${password.join(':')}`, true)}@${address}:${port}`;
         const url = new URL(link);
         for (const [key, value] of params) {
             url.searchParams.set(key, value)
@@ -1836,11 +1837,11 @@ Inbound.VmessSettings.VMESS = class extends XrayCommonClass {
         }
     }
     get _totalGB() {
-        return toFixed(this.totalGB / ONE_GB, 2);
+        return NumberFormatter.toFixed(this.totalGB / SizeFormatter.ONE_GB, 2);
     }
 
     set _totalGB(gb) {
-        this.totalGB = toFixed(gb * ONE_GB, 0);
+        this.totalGB = NumberFormatter.toFixed(gb * SizeFormatter.ONE_GB, 0);
     }
 
 };
@@ -1946,11 +1947,11 @@ Inbound.VLESSSettings.VLESS = class extends XrayCommonClass {
         }
     }
     get _totalGB() {
-        return toFixed(this.totalGB / ONE_GB, 2);
+        return NumberFormatter.toFixed(this.totalGB / SizeFormatter.ONE_GB, 2);
     }
 
     set _totalGB(gb) {
-        this.totalGB = toFixed(gb * ONE_GB, 0);
+        this.totalGB = NumberFormatter.toFixed(gb * SizeFormatter.ONE_GB, 0);
     }
 };
 Inbound.VLESSSettings.Fallback = class extends XrayCommonClass {
@@ -2098,11 +2099,11 @@ Inbound.TrojanSettings.Trojan = class extends XrayCommonClass {
         }
     }
     get _totalGB() {
-        return toFixed(this.totalGB / ONE_GB, 2);
+        return NumberFormatter.toFixed(this.totalGB / SizeFormatter.ONE_GB, 2);
     }
 
     set _totalGB(gb) {
-        this.totalGB = toFixed(gb * ONE_GB, 0);
+        this.totalGB = NumberFormatter.toFixed(gb * SizeFormatter.ONE_GB, 0);
     }
 
 };
@@ -2262,11 +2263,11 @@ Inbound.ShadowsocksSettings.Shadowsocks = class extends XrayCommonClass {
         }
     }
     get _totalGB() {
-        return toFixed(this.totalGB / ONE_GB, 2);
+        return NumberFormatter.toFixed(this.totalGB / SizeFormatter.ONE_GB, 2);
     }
 
     set _totalGB(gb) {
-        this.totalGB = toFixed(gb * ONE_GB, 0);
+        this.totalGB = NumberFormatter.toFixed(gb * SizeFormatter.ONE_GB, 0);
     }
 
 };

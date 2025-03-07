@@ -285,7 +285,7 @@ reset_webbasepath() {
 
     # Apply the new web base path setting
     /usr/local/x-ui/x-ui setting -webBasePath "/" >/dev/null 2>&1
-    
+
     echo -e "Web base path has been reset to: /"
     echo -e "${green}Please use the new web base path to access the panel.${plain}"
     restart
@@ -445,7 +445,7 @@ show_log() {
     1)
         journalctl -u x-ui -e --no-pager -f -p debug
         if [[ $# == 0 ]]; then
-        before_show_menu
+            before_show_menu
         fi
         ;;
     2)
@@ -463,9 +463,9 @@ show_log() {
 
 show_banlog() {
     local system_log="/var/log/fail2ban.log"
-    
+
     echo -e "${green}Checking ban logs...${plain}\n"
-    
+
     if ! systemctl is-active --quiet fail2ban; then
         echo -e "${red}Fail2ban service is not running!${plain}\n"
         return 1
@@ -509,7 +509,7 @@ bbr_menu() {
         disable_bbr
         bbr_menu
         ;;
-    *) 
+    *)
         echo -e "${red}Invalid option. Please select a valid number.${plain}\n"
         bbr_menu
         ;;
@@ -580,14 +580,14 @@ enable_bbr() {
 }
 
 update_shell() {
-    wget -O /usr/bin/x-ui -N --no-check-certificate https://github.com/appdatas/3x-ui/raw/main/x-ui.sh
+    wget -O /usr/bin/x-ui -N https://github.com/MHSanaei/3x-ui/raw/main/x-ui.sh
     if [[ $? != 0 ]]; then
         echo ""
         LOGE "Failed to download script, Please check whether the machine can connect Github"
         before_show_menu
     else
         chmod +x /usr/bin/x-ui
-        LOGI "Upgrade script succeeded, Please rerun the script" 
+        LOGI "Upgrade script succeeded, Please rerun the script"
         before_show_menu
     fi
 }
@@ -729,7 +729,7 @@ firewall_menu() {
         ufw status verbose
         firewall_menu
         ;;
-    *) 
+    *)
         echo -e "${red}Invalid option. Please select a valid number.${plain}\n"
         firewall_menu
         ;;
@@ -877,7 +877,6 @@ delete_ports() {
         exit 1
     fi
 }
-
 
 update_geo() {
     echo -e "${green}\t1.${plain} Loyalsoldier (geoip.dat, geosite.dat)"
