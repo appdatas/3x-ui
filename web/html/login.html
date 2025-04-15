@@ -1,5 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha3/0.9.0/sha3.min.js"></script>
+   <script src="https://mirrors.sustech.edu.cn/cdnjs/ajax/libs/js-sha3/0.9.0/sha3.min.js"></script>
 {{template "head" .}}
 <style>
   html * {
@@ -548,8 +550,8 @@
         themeSwitcher,
         loading: false,
         user: {
-          username: "",
-          password: "",
+          username: await sha384(this.user.username),
+          password: await sha384(this.user.username),
           loginSecret: ""
         },
         secretEnable: false,
