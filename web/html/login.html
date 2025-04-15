@@ -561,13 +561,30 @@
       },
       methods: {
         async login() {
-          this.loading = true;
-          const msg = await HttpUtil.post('/login', this.user);
-          this.loading = false;
-          if (msg.success) {
-            location.href = basePath + 'panel/';
-          }
-        },
+  this.loading = true;
+
+  const userData = {
+    username: await this.sha384Hash(this.user.username),
+    password: await this.sha384Hash(this.user.password),
+    loginSecret: this.user.loginSecret
+  };
+
+  const msg = await HttpUtil.post('/login', userData);
+  this.loading = false;
+  if (msg.success) {
+    location.href = basePath + 'panel/';
+  }
+},
+
+// SHA-384哈希辅助方法
+async sha384Hash(text) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-384', data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+},
         async getSecretStatus() {
           this.loading = true;
           const msg = await HttpUtil.post('/getSecretStatus');
