@@ -5,7 +5,7 @@ on:
 
 jobs:
   delete_assets:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       RELEASE_TAG: ${{ steps.get_tag.outputs.RELEASE_TAG }}
     steps:
