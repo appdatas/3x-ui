@@ -12,7 +12,6 @@ import (
 	"x-ui/config"
 	"x-ui/database"
 	"x-ui/logger"
-	"x-ui/sub"
 	"x-ui/util/crypto"
 	"x-ui/web"
 	"x-ui/web/global"
@@ -55,7 +54,6 @@ func runWebServer() {
 		log.Fatalf("Error starting web server: %v", err)
 		return
 	}
-
 
 	sigCh := make(chan os.Signal, 1)
 	// Trap shutdown signals
