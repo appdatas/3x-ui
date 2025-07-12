@@ -25,7 +25,7 @@ jobs:
           
           echo "All tags have been deleted"
         continue-on-error: true
-        
+
       - name: Get latest tag
         id: get_tag
         run: |
@@ -168,7 +168,7 @@ jobs:
           wget -O geosite_VN.dat https://github.com/vuong2023/vn-v2ray-rules/releases/latest/download/geosite.dat
           mv xray xray-linux-${{ matrix.platform }}
           cd ../..
-          
+
       - name: Package
         run: tar -zcvf x-ui-linux-${{ matrix.platform }}.tar.gz x-ui
 

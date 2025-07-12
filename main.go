@@ -12,10 +12,13 @@ import (
 	"x-ui/config"
 	"x-ui/database"
 	"x-ui/logger"
+	"x-ui/sub"
+	"x-ui/util/crypto"
 	"x-ui/web"
 	"x-ui/web/global"
 	"x-ui/web/service"
 
+	"github.com/joho/godotenv"
 	"github.com/op/go-logging"
 )
 
@@ -36,6 +39,8 @@ func runWebServer() {
 	default:
 		log.Fatalf("Unknown log level: %v", config.GetLogLevel())
 	}
+
+	godotenv.Load()
 
 	err := database.InitDB(config.GetDBPath())
 	if err != nil {
@@ -128,9 +133,7 @@ func showSetting(show bool) {
 			fmt.Println("get current user info failed, error info:", err)
 		}
 
-		username := userModel.Username
-		userpasswd := userModel.Password
-		if username == "" || userpasswd == "" {
+		if userModel.Username == "" || userModel.Password == "" {
 			fmt.Println("current username or password is empty")
 		}
 
@@ -140,8 +143,12 @@ func showSetting(show bool) {
 		} else {
 			fmt.Println("Panel is secure with SSL")
 		}
-		fmt.Println("username:", username)
-		fmt.Println("password:", userpasswd)
+
+		hasDefaultCredential := func() bool {
+			return userModel.Username == "admin" && crypto.CheckPasswordHash(userModel.Password, "admin")
+		}()
+
+		fmt.Println("hasDefaultCredential:", hasDefaultCredential)
 		fmt.Println("port:", port)
 		fmt.Println("webBasePath:", webBasePath)
 	}
@@ -203,7 +210,7 @@ func updateTgbotSetting(tgBotToken string, tgBotChatid string, tgBotRuntime stri
 	}
 }
 
-func updateSetting(port int, username string, password string, webBasePath string, listenIP string) {
+func updateSetting(port int, username string, password string, webBasePath string, listenIP string, resetTwoFactor bool) {
 	err := database.InitDB(config.GetDBPath())
 	if err != nil {
 		fmt.Println("Database initialization failed:", err)
@@ -237,6 +244,17 @@ func updateSetting(port int, username string, password string, webBasePath strin
 			fmt.Println("Failed to set base URI path:", err)
 		} else {
 			fmt.Println("Base URI path set successfully")
+		}
+	}
+
+	if resetTwoFactor {
+		err := settingService.SetTwoFactorEnable(false)
+
+		if err != nil {
+			fmt.Println("Failed to reset two-factor authentication:", err)
+		} else {
+			settingService.SetTwoFactorToken("")
+			fmt.Println("Two-factor authentication reset successfully")
 		}
 	}
 
@@ -320,36 +338,6 @@ func migrateDb() {
 	fmt.Println("Migration done!")
 }
 
-func removeSecret() {
-	userService := service.UserService{}
-
-	secretExists, err := userService.CheckSecretExistence()
-	if err != nil {
-		fmt.Println("Error checking secret existence:", err)
-		return
-	}
-
-	if !secretExists {
-		fmt.Println("No secret exists to remove.")
-		return
-	}
-
-	err = userService.RemoveUserSecret()
-	if err != nil {
-		fmt.Println("Error removing secret:", err)
-		return
-	}
-
-	settingService := service.SettingService{}
-	err = settingService.SetSecretStatus(false)
-	if err != nil {
-		fmt.Println("Error updating secret status:", err)
-		return
-	}
-
-	fmt.Println("Secret removed successfully.")
-}
-
 func main() {
 	if len(os.Args) < 2 {
 		runWebServer()
@@ -377,15 +365,15 @@ func main() {
 	var reset bool
 	var show bool
 	var getCert bool
-	var remove_secret bool
+	var resetTwoFactor bool
 	settingCmd.BoolVar(&reset, "reset", false, "Reset all settings")
 	settingCmd.BoolVar(&show, "show", false, "Display current settings")
-	settingCmd.BoolVar(&remove_secret, "remove_secret", false, "Remove secret key")
 	settingCmd.IntVar(&port, "port", 0, "Set panel port number")
 	settingCmd.StringVar(&username, "username", "", "Set login username")
 	settingCmd.StringVar(&password, "password", "", "Set login password")
 	settingCmd.StringVar(&webBasePath, "webBasePath", "", "Set base path for Panel")
 	settingCmd.StringVar(&listenIP, "listenIP", "", "set panel listenIP IP")
+	settingCmd.BoolVar(&resetTwoFactor, "resetTwoFactor", false, "Reset two-factor authentication settings")
 	settingCmd.BoolVar(&getListen, "getListen", false, "Display current panel listenIP IP")
 	settingCmd.BoolVar(&getCert, "getCert", false, "Display current certificate settings")
 	settingCmd.StringVar(&webCertFile, "webCert", "", "Set path to public key file for panel")
@@ -430,7 +418,7 @@ func main() {
 		if reset {
 			resetSetting()
 		} else {
-			updateSetting(port, username, password, webBasePath, listenIP)
+			updateSetting(port, username, password, webBasePath, listenIP, resetTwoFactor)
 		}
 		if show {
 			showSetting(show)
@@ -443,9 +431,6 @@ func main() {
 		}
 		if (tgbottoken != "") || (tgbotchatid != "") || (tgbotRuntime != "") {
 			updateTgbotSetting(tgbottoken, tgbotchatid, tgbotRuntime)
-		}
-		if remove_secret {
-			removeSecret()
 		}
 		if enabletgbot {
 			updateTgbotEnableSts(enabletgbot)
